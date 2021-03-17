@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<file:config name="File_Config" doc:name="File Config" doc:id="c1be944d-d8bc-4ddc-82f4-cc7d48b649b5" >
+		<file:connection workingDir="E:\MuleSoft\Fileprocess" />
+	</file:config>
+	<file:config name="File_Config1" doc:name="File Config" doc:id="1efeaf7f-1765-482e-9bc2-e186f4f5e0ab" >
+		<file:connection workingDir="E:\MuleSoft\Fileprocess" />
+	</file:config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="65de12ea-c042-4667-b0b4-ac0311b8943b" >
+		<db:my-sql-connection host="mudb.learn.mulesoft.com" port="3306" user="mule" password="mule" database="training" />
+	</db:config>
+	<file:config name="File_Config2" doc:name="File Config" doc:id="f83278b2-7731-495c-9473-571b23551fc5" >
+		<file:connection workingDir="E:\MuleSoft\Fileprocess" />
+	</file:config>
+	<flow name="fileprocessingFlow" doc:id="c3935b58-ba17-4814-9a10-50d7e9b82560" initialState="stopped">
+		<scheduler doc:name="Scheduler" doc:id="a8927fa2-fcfb-4f80-853f-8fffc1cfd78a" >
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</scheduler>
+		<os:retrieve doc:name="Retrieve" doc:id="0b34d8f5-1b4d-4e0b-9460-74988b453a22" key="lastAcountId">
+			<os:default-value ><![CDATA[#[payload]]]></os:default-value>
+		</os:retrieve>
+		<db:select doc:name="Select" doc:id="b9825e16-0d3a-47bd-86f3-02dcda3e4a2a" config-ref="Database_Config">
+			<db:sql ><![CDATA[SELECT * FROM accounts WHERE postal = :posta]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{ postal: '986532'}]]]></db:input-parameters>
+		</db:select>
+		<os:store doc:name="Store" doc:id="6ed379f4-10f8-4230-a7e2-5738e076707c" key="lastAccountId">
+			<os:value ><![CDATA[#[max(payload.*accountID)]]]></os:value>
+		</os:store>
+		<file:write doc:name="syncAccountspostal.csv" doc:id="29e40337-e4cd-41e4-bdf6-61b79b957175" config-ref="File_Config2" path="E:\MuleSoft\Fileprocess\postal\postal.csv">
+			<file:content><![CDATA[#[output application/csv header = false --- payload]]]></file:content>
+		</file:write>
+		<logger level="INFO" doc:name="csvPayload" doc:id="7fe93077-e57d-46a0-b385-697c47a53a17" message="#[output application/csv --- payload]"/>
+	</flow>
+	<flow name="getCSVAccounts/ProcessitemsinaCollecttionUsingForEahScope" doc:id="15583261-d545-4941-9c6a-3c7d8cc654e5" initialState="stopped">
+		<file:listener doc:name="accounts.csv" doc:id="56f66398-22b6-4c7e-b830-7b7f5666ce9d" config-ref="File_Config" directory="E:\MuleSoft\Fileprocess\input" moveToDirectory="E:\MuleSoft\Fileprocess\output">
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</file:listener>
+		<ee:transform doc:name="CSV To Java" doc:id="4326aa63-923a-4f06-8426-bc3010e36262" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<foreach doc:name="For Each" doc:id="e19e24a8-326a-465b-85ea-189e01779cce" >
+			<set-payload value="processed" doc:name="processed" doc:id="1ddc06f8-bb3e-4ba4-86de-cb1a21cb1d28" />
+			<logger level="INFO" doc:name="Logger" doc:id="6842a045-71a3-4d7e-b58a-cc55f11daa45" message="#[payload]"/>
+		</foreach>
+		<logger level="INFO" doc:name="payload" doc:id="648b0a62-5794-4dac-8bfd-2ddc61c2d407" message="#[payload]"/>
+	
+	<flow name="BatchProcessOnCSVAccounts" doc:id="e199e51a-9f3c-467e-8071-3f75792c2eaf" initialState="started">
+		<file:listener doc:name="On New or Updated File" doc:id="538bfc6a-0242-4673-89cf-193aa91ed7e1" config-ref="File_Config" directory="E:\MuleSoft\Fileprocess\output" moveToDirectory="E:\MuleSoft\Fileprocess\input">
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+		</file:listener>
+		<ee:transform doc:name="CSV to Java" doc:id="6648d1af-93f6-4fd7-9d1c-0cc00e411332" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[sizeOf(payload)]" doc:name="Size" doc:id="cf8a7b3b-b403-4733-a964-10853cd0c3fe" variableName="size"/>
+		<batch:job jobName="AccountsBatch_Job" doc:id="1546a370-2799-4510-a80f-5f60024aae10" >
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="36ace520-4f33-4d8c-8ac3-3374ef97d2ac" >
+					<set-variable value="#[payload.Name]" doc:name="cname" doc:id="1257d97f-36be-414b-a6fb-b2bd80622b75" variableName="cname"/>
+					<logger level="INFO" doc:name="Logger" doc:id="2da4a3d5-8a23-4769-aefc-2e7860e3465b" message="#[payload]"/>
+				</batch:step>
+				<batch:step name="Batch_Step1" doc:id="77b4c283-4d27-4823-a45c-006dff879d6a" >
+					<logger level="INFO" doc:name="Logger" doc:id="bc00a73f-0feb-448d-9dd8-edc9bf19f5a2" message="#[payload]"/>
+				</batch:step>
+			</batch:process-records>
+			<batch:on-complete >
+				<logger level="INFO" doc:name="Logger" doc:id="b486e412-1211-49a2-b2a3-1ddeccc44158" message="#[payload]"/>
+			</batch:on-complete>
+		</batch:job>
+	</flow>
+	
+	</flow>
+</mule>
